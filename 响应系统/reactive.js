@@ -1,5 +1,5 @@
 let activeEffect;
-const effectStack = [] // 新增副作用栈
+const effectStack = [] 
 const bucket = new WeakMap();
 const data = { text: "hello", ok: true, num: 1 };
 const proxyData = new Proxy(data, {
@@ -27,17 +27,17 @@ const proxyData = new Proxy(data, {
     if (!depsMap) return;
     const effects = depsMap.get(key);
     const effectsToRun = new Set(effects);
-    effectsToRun.forEach(effectFn => effectFn()) 
+    effectsToRun.forEach(effectFn => effectFn!==activeEffect?effectFn():'') //新增
   },
 });
 function effect(fn) {
   const effectFn = () => {
     cleanup(effectFn)
     activeEffect = effectFn;
-    effectStack.push(effectFn)// 新增
+    effectStack.push(effectFn)
     fn();
-    effectStack.pop()// 新增
-    activeEffect=effectStack[effectStack.length-1]// 新增
+    effectStack.pop()
+    activeEffect=effectStack[effectStack.length-1]
   };
   effectFn.deps = [];
   effectFn();
@@ -45,30 +45,23 @@ function effect(fn) {
 function cleanup(effectFn) { 
   for (let i = 0; i < effectFn.deps.length; i++) { 
     effectFn.deps[i].delete(effectFn)
-    //补充一下，因为引用的原因，这里的修改也会修改到bucket里的值
   }
   effectFn.deps.length = 0
 }
-//嵌套effect
+// 首先读取 obj.foo 的值，这会触发 track 操作，将当前副
+// 作用函数收集到“桶”中，接着将其加 1 后再赋值给 obj.foo，此时会
+// 触发 trigger 操作，即把“桶”中的副作用函数取出并执行。但问题是
+// 该副作用函数正在执行中，还没有执行完毕，就要开始下一次的执
+// 行。这样会导致无限递归地调用自己，于是就产生了栈溢出。
 effect(() => {
-  effect(() => {
-    console.log(proxyData.text)
-  })
-  console.log(proxyData.num);
+  proxyData.num++;//无限递归循环
 });
-proxyData.num = 100//这里会打印text
-// 我们用全局变量 activeEffect 来存储通过 effect 函数注册的
-// 副作用函数，这意味着同一时刻 activeEffect 所存储的副作用函数
-// 只能有一个。当副作用函数发生嵌套时，内层副作用函数的执行会覆
-// 盖 activeEffect 的值，并且永远不会恢复到原来的值。这时如果再
-// 有响应式数据进行依赖收集，即使这个响应式数据是在外层副作用函
-// 数中读取的，它们收集到的副作用函数也都会是内层副作用函数，这
-// 就是问题所在。
+// 解决办法并不难。通过分析这个问题我们能够发现，读取和设置
+// 操作是在同一个副作用函数内进行的。此时无论是 track 时收集的副
+// 作用函数，还是 trigger 时要触发执行的副作用函数，都是
+// activeEffect。基于此，我们可以在 trigger 动作发生时增加守
+// 卫条件：如果 trigger 触发执行的副作用函数与当前正在执行的副
+// 作用函数相同，则不触发执行
 
-// 为了解决这个问题，我们需要一个副作用函数栈 effectStack，
-// 在副作用函数执行时，将当前副作用函数压入栈中，待副作用函数执
-// 行完毕后将其从栈中弹出，并始终让 activeEffect 指向栈顶的副作
-// 用函数。这样就能做到一个响应式数据只会收集直接读取其值的副作
-// 用函数，而不会出现互相影响的情况
 
 
