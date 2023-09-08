@@ -1,4 +1,5 @@
 let activeEffect;
+const effectStack = [] // 新增副作用栈
 const bucket = new WeakMap();
 const data = { text: "hello", ok: true, num: 1 };
 const proxyData = new Proxy(data, {
@@ -25,20 +26,18 @@ const proxyData = new Proxy(data, {
     const depsMap = bucket.get(target);
     if (!depsMap) return;
     const effects = depsMap.get(key);
-    // 解决方法我们可以构造另外一个 Set集合并遍历它
     const effectsToRun = new Set(effects);
     effectsToRun.forEach(effectFn => effectFn()) 
-    // effects &&
-    //   effects.forEach((fn) => {
-    //     fn();
-    //   });
   },
 });
 function effect(fn) {
   const effectFn = () => {
     cleanup(effectFn)
     activeEffect = effectFn;
+    effectStack.push(effectFn)// 新增
     fn();
+    effectStack.pop()// 新增
+    activeEffect=effectStack[effectStack.length-1]// 新增
   };
   effectFn.deps = [];
   effectFn();
@@ -46,19 +45,30 @@ function effect(fn) {
 function cleanup(effectFn) { 
   for (let i = 0; i < effectFn.deps.length; i++) { 
     effectFn.deps[i].delete(effectFn)
+    //补充一下，因为引用的原因，这里的修改也会修改到bucket里的值
   }
-  //for循环之后再设置为0
   effectFn.deps.length = 0
 }
+//嵌套effect
 effect(() => {
-  console.log(proxyData.ok ? proxyData.text : "-");
+  effect(() => {
+    console.log(proxyData.text)
+  })
+  console.log(proxyData.num);
 });
-proxyData.ok = false;
-//proxyData.text = "changed";
+proxyData.num = 100//这里会打印text
+// 我们用全局变量 activeEffect 来存储通过 effect 函数注册的
+// 副作用函数，这意味着同一时刻 activeEffect 所存储的副作用函数
+// 只能有一个。当副作用函数发生嵌套时，内层副作用函数的执行会覆
+// 盖 activeEffect 的值，并且永远不会恢复到原来的值。这时如果再
+// 有响应式数据进行依赖收集，即使这个响应式数据是在外层副作用函
+// 数中读取的，它们收集到的副作用函数也都会是内层副作用函数，这
+// 就是问题所在。
 
-// 解决一个问题代码会无限执行
-// 触发set时 
-// 调用 forEach 遍历 Set 集合
-// 时，如果一个值已经被访问过了，但该值被删除并重新添加到集合，
-// 如果此时 forEach 遍历没有结束，那么该值会重新被访问。因此，上
-// 面的代码会无限执行
+// 为了解决这个问题，我们需要一个副作用函数栈 effectStack，
+// 在副作用函数执行时，将当前副作用函数压入栈中，待副作用函数执
+// 行完毕后将其从栈中弹出，并始终让 activeEffect 指向栈顶的副作
+// 用函数。这样就能做到一个响应式数据只会收集直接读取其值的副作
+// 用函数，而不会出现互相影响的情况
+
+
