@@ -101,21 +101,32 @@ function computed(getter) {
 // const sumRes = computed(() => {
 //   return proxyData.num + 1
 // })
- // watch 函数接收两个参数，source 是响应式数据，cb 是回调函数
 function watch(source, cb) {
-   // 触发读取操作，从而建立联系
-  effect(() => source.num,
+  // 调用 traverse 递归地读取
+  effect(() => traverse(source),//修改
     {
       scheduler() {
-      // 当数据变化时，调用回调函数 cb
       cb()
   }})
+}
+function traverse(source, seen = new Set()) {
+   // 如果要读取的数据是原始值，或者已经被读取过了，那么什么都不做
+  if (typeof source !== 'object' || source == null || seen.has(source)) return 
+  // 将数据添加到 seen 中，代表遍历地读取过了，避免循环引用引起的死循环
+  seen.add(source)
+  // 假设 value 就是一个对象，使用 for...in 读取对象的每一个值，并递归地调用 traverse 进行处理
+  for (const key in source) {
+    traverse(source[key],seen)
+  }
 }
 watch(proxyData, () => {
   console.log('changed')
 })
 proxyData.num=999
 proxyData.num=997
+proxyData.text = 'watch'
 
-// watch 的实现本质上就是利用了 effect 以及
-// options.scheduler 选项
+//在 watch 内部的 effect 中调用 traverse
+// 函数进行递归的读取操作，代替硬编码的方式，这样就能读取一个对
+// 象上的任意属性，从而当任意属性发生变化时都能够触发回调函数执
+// 行
