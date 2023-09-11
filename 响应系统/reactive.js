@@ -52,18 +52,23 @@ const proxyData = new Proxy(data, {
     trigger(target, key)
   },
 });
-function effect(fn,options={}) {//effect都需要执行一遍副作用函数才能收集上
+function effect(fn,options={}) {
   const effectFn = () => {
     cleanup(effectFn)
     activeEffect = effectFn;
     effectStack.push(effectFn)
+    const res=fn()//新增
     fn();
     effectStack.pop()
-    activeEffect=effectStack[effectStack.length-1]
+    activeEffect = effectStack[effectStack.length - 1]
+    return res//新增
   };
   effectFn.options = options
   effectFn.deps = [];
-  effectFn();
+  if (!options.lazy) {//新增
+    effectFn();
+  }
+    return effectFn();//新增
 }
 function cleanup(effectFn) { 
   for (let i = 0; i < effectFn.deps.length; i++) { 
@@ -71,14 +76,4 @@ function cleanup(effectFn) {
   }
   effectFn.deps.length = 0
 }
-effect(() => {
-  console.log(proxyData.num);
-}, {
-   scheduler(fn) {
-   jobQueue.add(fn)
-   flushJob()
-   }
-   }
-);
-proxyData.num++
 
