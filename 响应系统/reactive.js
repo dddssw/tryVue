@@ -102,19 +102,28 @@ function computed(getter) {
 //   return proxyData.num + 1
 // })
 function watch(source, cb) {
-  // 调用 traverse 递归地读取
-  effect(() => traverse(source),//修改
+  // 定义 getter
+  let getter;
+  // 如果 source 是函数，说明用户传递的是 getter，所以直接把 source 赋值给 getter
+  if (typeof source === "function") {
+    getter = source;
+  } else {
+    // 否则按照原来的实现调用 traverse 递归地读取
+    getter = () => traverse(source);
+  }
+  effect(
+    // 执行 getter
+    () => getter(),
     {
       scheduler() {
-      cb()
-  }})
+        cb();
+      },
+    }
+  );
 }
 function traverse(source, seen = new Set()) {
-   // 如果要读取的数据是原始值，或者已经被读取过了，那么什么都不做
   if (typeof source !== 'object' || source == null || seen.has(source)) return 
-  // 将数据添加到 seen 中，代表遍历地读取过了，避免循环引用引起的死循环
   seen.add(source)
-  // 假设 value 就是一个对象，使用 for...in 读取对象的每一个值，并递归地调用 traverse 进行处理
   for (const key in source) {
     traverse(source[key],seen)
   }
@@ -126,7 +135,3 @@ proxyData.num=999
 proxyData.num=997
 proxyData.text = 'watch'
 
-//在 watch 内部的 effect 中调用 traverse
-// 函数进行递归的读取操作，代替硬编码的方式，这样就能读取一个对
-// 象上的任意属性，从而当任意属性发生变化时都能够触发回调函数执
-// 行
