@@ -57,18 +57,18 @@ function effect(fn,options={}) {
     cleanup(effectFn)
     activeEffect = effectFn;
     effectStack.push(effectFn)
-    const res=fn()//新增
+    const res=fn()
     fn();
     effectStack.pop()
     activeEffect = effectStack[effectStack.length - 1]
-    return res//新增
+    return res
   };
   effectFn.options = options
   effectFn.deps = [];
-  if (!options.lazy) {//新增
+  if (!options.lazy) {
     effectFn();
   }
-    return effectFn();//新增
+    return effectFn;
 }
 function cleanup(effectFn) { 
   for (let i = 0; i < effectFn.deps.length; i++) { 
@@ -76,4 +76,17 @@ function cleanup(effectFn) {
   }
   effectFn.deps.length = 0
 }
-
+function computed(getter) {//新增
+  // 把 getter 作为副作用函数，创建一个 lazy 的 effect
+  const effectFn = effect(getter, { lazy: true })
+  const obj = {
+    get value() {
+      return effectFn()
+    }
+  }
+  return obj
+}
+const sumRes = computed(() => proxyData.num+1)
+console.log(sumRes.value)//2
+proxyData.num++
+console.log(sumRes.value)//3
