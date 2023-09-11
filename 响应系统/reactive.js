@@ -77,31 +77,42 @@ function cleanup(effectFn) {
   effectFn.deps.length = 0
 }
 function computed(getter) {
-  // value 用来缓存上一次计算的值
-  let value//新增
-  // dirty 标志，用来标识是否需要重新 计算值为 true 则意味着“脏”，需要计算
-  let dirty=true//新增
+  let value
+  let dirty=true
   const effectFn = effect(getter, {
     lazy: true,
-     //新增 添加调度器，在调度器中将 dirty 重置为 true
     scheduler() {
-    dirty = true
+      dirty = true
+      trigger(obj, 'value')// 当计算属性依赖的响应式数据变化时，手动调用 trigger 函数触发响应
   }
   })
   const obj = {
     get value() {
-      if (dirty) {//新增
+      if (dirty) {
         value = effectFn()
-        dirty=false//新增
+        dirty=false
       }
-      return value//新增
+      track(obj, 'value')// 当读取 value 时，手动调用 track 函数进行追踪
+      return value
     }
   }
   return obj
 }
 const sumRes = computed(() => {
-  console.log('changed');
   return proxyData.num + 1
 })
-console.log(sumRes.value)
-console.log(sumRes.value)//不会打印changed
+effect(() => {
+   // 在该副作用函数中读取 sumRes.value
+   console.log(sumRes.value)
+   })
+   // 修改 proxyData.num 的值
+   proxyData.num++
+
+//sumRes 是一个计算属性，并且在另一个
+// effect 的副作用函数中读取了 sumRes.value 的值。如果此时修改
+// obj.foo 的值，我们期望副作用函数重新执行，就像我们在 Vue.js 的
+// 模板中读取计算属性值的时候，一旦计算属性发生变化就会触发重新
+
+//解决办法：当读取计算属性的值时，我们可以手动调用
+// track 函数进行追踪；当计算属性依赖的响应式数据发生变化时，我
+// 们可以手动调用 trigger 函数触发响应
