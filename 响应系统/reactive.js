@@ -76,17 +76,32 @@ function cleanup(effectFn) {
   }
   effectFn.deps.length = 0
 }
-function computed(getter) {//新增
-  // 把 getter 作为副作用函数，创建一个 lazy 的 effect
-  const effectFn = effect(getter, { lazy: true })
+function computed(getter) {
+  // value 用来缓存上一次计算的值
+  let value//新增
+  // dirty 标志，用来标识是否需要重新 计算值为 true 则意味着“脏”，需要计算
+  let dirty=true//新增
+  const effectFn = effect(getter, {
+    lazy: true,
+     //新增 添加调度器，在调度器中将 dirty 重置为 true
+    scheduler() {
+    dirty = true
+  }
+  })
   const obj = {
     get value() {
-      return effectFn()
+      if (dirty) {//新增
+        value = effectFn()
+        dirty=false//新增
+      }
+      return value//新增
     }
   }
   return obj
 }
-const sumRes = computed(() => proxyData.num+1)
-console.log(sumRes.value)//2
-proxyData.num++
-console.log(sumRes.value)//3
+const sumRes = computed(() => {
+  console.log('changed');
+  return proxyData.num + 1
+})
+console.log(sumRes.value)
+console.log(sumRes.value)//不会打印changed
