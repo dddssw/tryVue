@@ -98,21 +98,24 @@ function computed(getter) {
   }
   return obj
 }
-const sumRes = computed(() => {
-  return proxyData.num + 1
+// const sumRes = computed(() => {
+//   return proxyData.num + 1
+// })
+ // watch 函数接收两个参数，source 是响应式数据，cb 是回调函数
+function watch(source, cb) {
+   // 触发读取操作，从而建立联系
+  effect(() => source.num,
+    {
+      scheduler() {
+      // 当数据变化时，调用回调函数 cb
+      cb()
+  }})
+}
+watch(proxyData, () => {
+  console.log('changed')
 })
-effect(() => {
-   // 在该副作用函数中读取 sumRes.value
-   console.log(sumRes.value)
-   })
-   // 修改 proxyData.num 的值
-   proxyData.num++
+proxyData.num=999
+proxyData.num=997
 
-//sumRes 是一个计算属性，并且在另一个
-// effect 的副作用函数中读取了 sumRes.value 的值。如果此时修改
-// obj.foo 的值，我们期望副作用函数重新执行，就像我们在 Vue.js 的
-// 模板中读取计算属性值的时候，一旦计算属性发生变化就会触发重新
-
-//解决办法：当读取计算属性的值时，我们可以手动调用
-// track 函数进行追踪；当计算属性依赖的响应式数据发生变化时，我
-// 们可以手动调用 trigger 函数触发响应
+// watch 的实现本质上就是利用了 effect 以及
+// options.scheduler 选项
