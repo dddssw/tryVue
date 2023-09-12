@@ -1,25 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="app"></div>
     <script src="https://unpkg.com/@vue/reactivity@3.0.5/dist/reactivity.global.js"></script>
     <script>
-      const { effect, ref } = VueReactivity;
-      function renderer(domString, container) {
-        container.innerHTML = domString;
-      }
-      const count = ref(1);
-      effect(() => {
-        renderer(`<h1>${count.value}</h1>`, document.getElementById("app"));
-      });
-      count.value++;
-    </script>
-  </body>
-</html>
+        const vnode = {
+            type: 'div',
+            children: [
+                {
+                    type: 'p',
+                    children: 'hello'
+                }
+            ]
+        }
 
-   
+        function createRenderer(options) {
+
+            // 通过 options 得到操作 DOM 的 API
+            const {
+                createElement,
+                insert,
+                setElementText
+            } = options
+
+            function render(vnode, container) {
+                if (vnode) {
+                    patch(container._vnode, vnode, container)
+                } else {
+                    if (container._vnode) {
+                        container.innerHTML = ''
+                    }
+                }
+                container._vnode = vnode
+            }
+            // 在这个作用域内定义的函数都可以访问那些 API
+            function mountElement(vnode, container) {
+                const el =createElement(vnode.type)
+                if(typeof vnode.children ==="string"){
+                    setElementText(el, vnode.children)
+                }else{
+                    vnode.children.forEach(item=>{
+                        patch(null, item, el)
+                    })
+                }
+                insert(el, container)
+
+            }
+
+            function patch(n1, n2, container) {
+                if (!n1) {
+                    mountElement(n2, container)
+                } else {
+                }
+            }
+
+            return {
+                render
+            }
+        }
+        // 在创建 renderer 时传入配置项
+        const renderer = createRenderer({
+            createElement(tag) {
+                return document.createElement(tag)
+            },
+            setElementText(el, text) {
+                el.textContent = text
+            },
+            insert(el, parent, anchor = null) {
+                parent.insertBefore(el, anchor)
+            }
+        })
+        let container=document.querySelector('#app')
+        debugger
+        renderer.render(vnode, container)
+    </script>
+</body>
+
+</html>
