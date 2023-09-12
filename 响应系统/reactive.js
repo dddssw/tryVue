@@ -109,9 +109,22 @@ function watch(source, cb , options={}) {
     getter = () => traverse(source);
   }
   let oldValue, newValue;
+  // cleanup 用来存储用户注册的过期回调
+  let cleanup;
+  // 定义 onInvalidate 函数
+  function onInvalidate(fn) {
+    // 将过期回调存储到 cleanup 中
+    cleanup = fn;
+  }
+
  const job = () => {
    newValue = effectFn();
-   cb(newValue, oldValue);
+   // 在调用回调函数 cb 之前，先调用过期回调
+   if (cleanup) {
+     cleanup();
+   }
+   // 将 onInvalidate 作为回调函数的第三个参数，以便用户使用
+   cb(newValue, oldValue,onInvalidate);
    oldValue = newValue;
  };
   const effectFn = effect(() => getter(), {
@@ -151,6 +164,5 @@ watch(
 );
 proxyData.num++
 
-// 在调度器函数内检测 options.flush 的值是否为 post，如果
-// 是，则将 job 函数放到微任务队列中，从而实现异步延迟执行；否则
-// 直接执行 job 函数
+//如果在watch修改两次,并且其中回调中发送接口请求,因为不知道这两次请求的返回顺序,所以获取的值并不是最新的。
+//过期之后就不需要执行了。老数据直接丢弃
