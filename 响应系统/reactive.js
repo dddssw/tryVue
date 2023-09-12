@@ -109,7 +109,6 @@ function watch(source, cb , options={}) {
     getter = () => traverse(source);
   }
   let oldValue, newValue;
-  // 提取 scheduler 调度函数为一个独立的 job 函数
  const job = () => {
    newValue = effectFn();
    cb(newValue, oldValue);
@@ -117,7 +116,15 @@ function watch(source, cb , options={}) {
  };
   const effectFn = effect(() => getter(), {
     lazy: true,
-    scheduler :job,
+    scheduler: () => {
+      // 在调度函数中判断 flush 是否为 'post'，如果是，将其放到微任务队列中执行
+      if (options.flush === "post") {
+        const p = Promise.resolve();
+        p.then(job);
+      } else {
+        job();
+      }
+    },
   });
   if (options.immediate) {// 新增
     job()
@@ -139,8 +146,11 @@ watch(
     console.log(newValue, oldValue);
   },
   {
-    // 回调函数会在 watch 创建时立即执行一次
-    immediate: true,
+    flush: 'post',
   }
 );
 proxyData.num++
+
+// 在调度器函数内检测 options.flush 的值是否为 post，如果
+// 是，则将 job 函数放到微任务队列中，从而实现异步延迟执行；否则
+// 直接执行 job 函数
