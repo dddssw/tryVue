@@ -83,7 +83,7 @@ function computed(getter) {
     lazy: true,
     scheduler() {
       dirty = true
-      trigger(obj, 'value')// 当计算属性依赖的响应式数据变化时，手动调用 trigger 函数触发响应
+      trigger(obj, 'value')
   }
   })
   const obj = {
@@ -92,7 +92,7 @@ function computed(getter) {
         value = effectFn()
         dirty=false
       }
-      track(obj, 'value')// 当读取 value 时，手动调用 track 函数进行追踪
+      track(obj, 'value')
       return value
     }
   }
@@ -101,29 +101,30 @@ function computed(getter) {
 // const sumRes = computed(() => {
 //   return proxyData.num + 1
 // })
-function watch(source, cb) {
+function watch(source, cb , options={}) {
   let getter;
   if (typeof source === "function") {
     getter = source;
   } else {
     getter = () => traverse(source);
   }
-  // 定义旧值与新值
   let oldValue, newValue;
-  // 使用 effect 注册副作用函数时，开启 lazy 选项，并把返回值存储到effectFn 中以便后续手动调用
+  // 提取 scheduler 调度函数为一个独立的 job 函数
+ const job = () => {
+   newValue = effectFn();
+   cb(newValue, oldValue);
+   oldValue = newValue;
+ };
   const effectFn = effect(() => getter(), {
     lazy: true,
-    scheduler() {
-      // 在 scheduler 中重新执行副作用函数，得到的是新值
-      newValue = effectFn();
-      // 将旧值和新值作为回调函数的参数
-      cb(newValue, oldValue);
-      // 更新旧值，不然下一次会得到错误的旧值
-      oldValue = newValue;
-    },
+    scheduler :job,
   });
-  // 手动调用副作用函数，拿到的值就是旧值
-  oldValue = effectFn()
+  if (options.immediate) {// 新增
+    job()
+  } else {
+    oldValue = effectFn()
+  }
+ 
 }
 function traverse(source, seen = new Set()) {
   if (typeof source !== 'object' || source === null || seen.has(source)) return 
@@ -132,19 +133,14 @@ function traverse(source, seen = new Set()) {
     traverse(source[key],seen)
   }
 }
-watch(()=>proxyData.num, (newValue, oldValue) => {
-  console.log(newValue,oldValue)
-})
+watch(
+  () => proxyData.num,
+  (newValue, oldValue) => {
+    console.log(newValue, oldValue);
+  },
+  {
+    // 回调函数会在 watch 创建时立即执行一次
+    immediate: true,
+  }
+);
 proxyData.num++
-
-
-//  给watch添加新值和旧值 使用 lazy 选项创建了一个懒执
-// 行的 effect。注意上面代码中最下面的部分，我们手动调用
-// effectFn 函数得到的返回值就是旧值，即第一次执行得到的值。当
-// 变化发生并触发 scheduler 调度函数执行时，会重新调用
-// effectFn 函数并得到新值，这样我们就拿到了旧值与新值，接着将
-// 它们作为参数传递给回调函数 cb 就可以了。最后一件非常重要的事情
-// 是，不要忘记使用新值更新旧值：oldValue = newValue，否则在
-// 下一次变更发生时会得到错误的旧值。
-
-//备注：修改watch第一个参数可以接受getter之后,现在就不能写watch(proxyData.num)，而是watch(()=>proxyData.num)
