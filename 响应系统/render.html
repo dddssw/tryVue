@@ -12,13 +12,12 @@
     <script src="https://unpkg.com/@vue/reactivity@3.0.5/dist/reactivity.global.js"></script>
     <script>
         const vnode = {
-            type: 'div',
-            children: [
-                {
-                    type: 'p',
-                    children: 'hello'
-                }
-            ]
+            type: 'button',
+            props: {
+                id: 'foo',
+                disabled: false
+            },
+            children: '点击'
         }
 
         function createRenderer(options) {
@@ -42,14 +41,37 @@
             }
             // 在这个作用域内定义的函数都可以访问那些 API
             function mountElement(vnode, container) {
-                const el =createElement(vnode.type)
-                if(typeof vnode.children ==="string"){
+                const el = createElement(vnode.type)
+                if (typeof vnode.children === "string") {
                     setElementText(el, vnode.children)
-                }else{
-                    vnode.children.forEach(item=>{
+                } else {
+                    vnode.children.forEach(item => {
                         patch(null, item, el)
                     })
                 }
+                if (vnode.props) {
+                    for (const key in vnode.props) {
+                        const value = vnode.props[key]
+                        if (shouldSetAsProps(el, key, value)) {
+                            if (key in el) {
+                                // 获取该 DOM Properties 的类型
+                                const type = typeof el[key]
+                                if (type === 'boolean' && value === '') {
+                                    el[key] = true
+                                } else {
+                                    el[key] = value
+                                }
+                            }
+                            else {
+                                el.setAttribute(key, value)
+                            }
+                        } else {
+                            el.setAttribute(key, value)
+                        }
+
+                    }
+                }
+
                 insert(el, container)
 
             }
@@ -60,7 +82,13 @@
                 } else {
                 }
             }
-
+            //有一些 DOM Properties 是只读的,下面只是处理了一种特殊情况
+            function shouldSetAsProps(el, key, value) {
+                // 特殊处理
+                if (key === 'form' && el.tagName === 'INPUT') return false
+                // 兜底
+                return key in el
+            }
             return {
                 render
             }
@@ -77,10 +105,16 @@
                 parent.insertBefore(el, anchor)
             }
         })
-        let container=document.querySelector('#app')
-        debugger
+        let container = document.querySelector('#app')
         renderer.render(vnode, container)
     </script>
 </body>
 
 </html>
+// 有两种方式设置props setAttribute / DOM 对象直接设置
+//HTML Attributes 与 DOM Properties
+//并不是一一对应的
+//HTML Attributes的作用是设置与之对应的 DOM Properties 的初始值。
+//例如对于button有一个disabled属性
+// el.setAttribute('disabled', false)= el.setAttribute('disabled', 'false')这是因为使用 setAttribute 函数设置的值总是会被字符串化
+//el.disabled = '' === el.disabled = false 由于 el.disabled 是布尔类型的值，所以当我们尝试将它设置为空字符串时，浏览器会将它的值矫正为布尔类型的值，即 false。
