@@ -92,7 +92,8 @@
             },
             // 将属性设置相关操作封装到 patchProps 函数中，并作为渲染器选项传递
             patchProps(el, key, prevValue, nextValue) {
-                if (shouldSetAsProps(el, key, nextValue)) {
+                if (key === 'class') {el.className = nextValue || ''}
+                else if (shouldSetAsProps(el, key, nextValue)) {
                     const type = typeof el[key]
                     if (type === 'boolean' && nextValue === '') {
                         el[key] = true
@@ -111,10 +112,7 @@
 </body>
 
 </html>
-// 有两种方式设置props setAttribute / DOM 对象直接设置
-//HTML Attributes 与 DOM Properties
-//并不是一一对应的
-//HTML Attributes的作用是设置与之对应的 DOM Properties 的初始值。
-//例如对于button有一个disabled属性
-// el.setAttribute('disabled', false)= el.setAttribute('disabled', 'false')这是因为使用 setAttribute 函数设置的值总是会被字符串化
-//el.disabled = '' === el.disabled = false 由于 el.disabled 是布尔类型的值，所以当我们尝试将它设置为空字符串时，浏览器会将它的值矫正为布尔类型的值，即 false。
+<!-- 因为 class 的值可以是多种类型，所以我们必须在设
+置元素的 class 之前将值归一化为统一的字符串形式，再把该字符串
+作为元素的 class 值去设置。因此，我们需要封装
+normalizeClass 函数, -->
