@@ -19,16 +19,19 @@
             },
             children: '点击'
         }
-        //有一些 DOM Properties 是只读的,下面只是处理了一种特殊情况
+        function unmount(vnode) {
+            const parent = vnode.el.parentNode
+            if (parent) {
+                parent.removeChild(vnode.el)
+            }
+        }
+
         function shouldSetAsProps(el, key, value) {
-            // 特殊处理
             if (key === 'form' && el.tagName === 'INPUT') return false
-            // 兜底
             return key in el
         }
         function createRenderer(options) {
 
-            // 通过 options 得到操作 DOM 的 API
             const {
                 createElement,
                 insert,
@@ -41,14 +44,15 @@
                     patch(container._vnode, vnode, container)
                 } else {
                     if (container._vnode) {
-                        container.innerHTML = ''
+                        //根据 vnode 对象获取与其相关联的真实DOM 元素，然后使用原生 DOM 操作方法将该 DOM 元素移除
+                        //在mountElement就把它存在vnode的el
+                        unmount(container._vnode)
                     }
                 }
                 container._vnode = vnode
             }
-            // 在这个作用域内定义的函数都可以访问那些 API
             function mountElement(vnode, container) {
-                const el = createElement(vnode.type)
+                const el = vnode.el = createElement(vnode.type)//add
                 if (typeof vnode.children === "string") {
                     setElementText(el, vnode.children)
                 } else {
@@ -58,16 +62,11 @@
                 }
                 if (vnode.props) {
                     for (const key in vnode.props) {
-                        // 调用 patchProps 函数即可
                         patchProps(el, key, null, vnode.props[key])
-
                     }
                 }
-
                 insert(el, container)
-
             }
-
             function patch(n1, n2, container) {
                 if (!n1) {
                     mountElement(n2, container)
@@ -79,7 +78,6 @@
                 render
             }
         }
-        // 在创建 renderer 时传入配置项
         const renderer = createRenderer({
             createElement(tag) {
                 return document.createElement(tag)
@@ -90,9 +88,8 @@
             insert(el, parent, anchor = null) {
                 parent.insertBefore(el, anchor)
             },
-            // 将属性设置相关操作封装到 patchProps 函数中，并作为渲染器选项传递
             patchProps(el, key, prevValue, nextValue) {
-                if (key === 'class') {el.className = nextValue || ''}
+                if (key === 'class') { el.className = nextValue || '' }
                 else if (shouldSetAsProps(el, key, nextValue)) {
                     const type = typeof el[key]
                     if (type === 'boolean' && nextValue === '') {
@@ -112,7 +109,3 @@
 </body>
 
 </html>
-<!-- 因为 class 的值可以是多种类型，所以我们必须在设
-置元素的 class 之前将值归一化为统一的字符串形式，再把该字符串
-作为元素的 class 值去设置。因此，我们需要封装
-normalizeClass 函数, -->
