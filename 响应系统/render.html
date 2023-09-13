@@ -44,15 +44,13 @@
                     patch(container._vnode, vnode, container)
                 } else {
                     if (container._vnode) {
-                        //根据 vnode 对象获取与其相关联的真实DOM 元素，然后使用原生 DOM 操作方法将该 DOM 元素移除
-                        //在mountElement就把它存在vnode的el
                         unmount(container._vnode)
                     }
                 }
                 container._vnode = vnode
             }
             function mountElement(vnode, container) {
-                const el = vnode.el = createElement(vnode.type)//add
+                const el = vnode.el = createElement(vnode.type)//add，对这个入参添加el属性，传入的入参的改变会一直保留下来，因为他是引用类型
                 if (typeof vnode.children === "string") {
                     setElementText(el, vnode.children)
                 } else {
@@ -67,10 +65,19 @@
                 }
                 insert(el, container)
             }
-            function patch(n1, n2, container) {
+            function patch(n1, n2, container) {//旧值 新值
+                //标签不同，直接卸载旧的再挂载新的
+                if (n1 && n1.type !== n2.type) {
+                    mountElement()
+                    n1 = null
+                }
                 if (!n1) {
                     mountElement(n2, container)
                 } else {
+                    if (n1.type !== n2.type) {
+                        unmount(n2)
+                        mountElement(n1, container)
+                    }
                 }
             }
 
