@@ -11,7 +11,8 @@
     <div id="app"></div>
     <script src="https://unpkg.com/@vue/reactivity@3.0.5/dist/reactivity.global.js"></script>
     <script>
-        const vnode = {
+        const { effect, reactive } = VueReactivity;
+        const vnode = reactive({
             type: 'button',
             props: {
                 id: 'foo',
@@ -22,7 +23,7 @@
 
             },
             children: '点击'
-        }
+        })
         function unmount(vnode) {
             const parent = vnode.el.parentNode
             if (parent) {
@@ -78,10 +79,10 @@
                 if (!n1) {
                     mountElement(n2, container)
                 } else {
-                    if (n1.type !== n2.type) {
+                    // if (n1.type !== n2.type) {
                         unmount(n2)
                         mountElement(n1, container)
-                    }
+                // }
                 }
             }
 
@@ -100,12 +101,30 @@
                 parent.insertBefore(el, anchor)
             },
             patchProps(el, key, prevValue, nextValue) {
-                // 匹配以 on 开头的属性，视其为事件
                 if (/^on/.test(key)) {
-                    // 根据属性名称得到对应的事件名称，例如 onClick ---> click
+                    // 获取为该元素伪造的事件处理函数 invoker
+                    let invoker = el._vei
                     const name = key.slice(2).toLowerCase()
-                    // 绑定事件，nextValue 为事件处理函数
-                    el.addEventListener(name, nextValue)
+                    if (nextValue) {
+                        if (invoker) {
+                            //代表需要替换
+                            invoker.value = nextValue
+                        } else {
+                            // 如果没有 invoker，则将一个伪造的 invoker 缓存到 el._vei 中
+                            // vei 是 vue event invoker 的首字母缩写
+                            invoker = el._vei = (e) => {
+                                // 当伪造的事件处理函数执行时，会执行真正的事件处理函数
+                                invoker.value(e)
+                            }
+                            // 将真正的事件处理函数赋值给 invoker.value
+                            invoker.value = nextValue
+                            // 绑定 invoker 作为事件处理函数
+                            el.addEventListener(name, invoker)
+                        }
+                    } else if (invoker) {
+                        // 新的事件绑定函数不存在，且之前绑定的 invoker 存在，则移除绑定
+                        el.removeEventListener(name, invoker)
+                    }
                 }
                 if (key === 'class') { el.className = nextValue || '' }
                 else if (shouldSetAsProps(el, key, nextValue)) {
@@ -122,9 +141,24 @@
 
         })
         let container = document.querySelector('#app')
-        renderer.render(vnode, container)
+        effect(() => {
+            renderer.render(vnode, container)
+        });
+        vnode.props.onClick = () => {
+            alert('hhhh!!!!!')
+        }
     </script>
 </body>
 
 </html>
 
+//如何更新事件
+//对于同一个事件类型，我们需要先卸载再绑定，以防止重复绑定。
+<!-- 还有一种性能更优的方式
+来完成事件更新。在绑定事件时，我们可以绑定一个伪造的事件处理
+函数 invoker，然后把真正的事件处理函数设置为 invoker.value
+属性的值。这样当更新事件的时候，我们将不再需要调用
+removeEventListener 函数来移除上一次绑定的事件，只需要更新
+invoker.value 的值即可 -->
+//使用伪造的事件处理函数替换元素的事件处理函数时，前一个处理函数会被忽略，并且不会影响事件的执行。这是因为事件监听器引用的是函数对象本身，
+而不是特定的函数名或变量
