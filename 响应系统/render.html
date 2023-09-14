@@ -80,9 +80,9 @@
                     mountElement(n2, container)
                 } else {
                     // if (n1.type !== n2.type) {
-                        unmount(n2)
-                        mountElement(n1, container)
-                // }
+                    unmount(n2)
+                    mountElement(n1, container)
+                    // }
                 }
             }
 
@@ -103,14 +103,22 @@
             patchProps(el, key, prevValue, nextValue) {
                 if (/^on/.test(key)) {
                     // 获取为该元素伪造的事件处理函数 invoker
-                    let invokers = el._vei||( el._vei={})
+                    let invokers = el._vei || (el._vei = {})
                     const name = key.slice(2).toLowerCase()
                     if (nextValue) {
                         if (invokers[key]) {
                             invokers[key].value = nextValue
                         } else {
                             invokers[key] = el._vei.key = (e) => {
-                                invokers[key].value(e)
+                                // 如果 invoker.value 是数组，则遍历它并逐个调用事件处理函数
+                                if (Array.isArray(invokers[key].value)) {
+                                    invokers[key].value.forEach((fn) => {
+                                        fn(e)
+                                    })
+                                }
+                                else {
+                                    invokers[key].value(e)
+                                }
                             }
                             invokers[key].value = nextValue
                             el.addEventListener(name, invokers[key])
@@ -137,18 +145,19 @@
         effect(() => {
             renderer.render(vnode, container)
         });
-        vnode.props.onmouseover  = () => {
-           console.log('sss')
-        }
+        vnode.props.onClick = [() => {
+            alert('ss1')
+        }, () => {
+            alert('ss2')
+        }]
     </script>
 </body>
 
 </html>
 
-<!-- invoker的数据结构是有问题的，一个元素同时绑定了多种事件，将会出现事件覆盖的现象。
-例如我们改成
-vnode.props.onmouseover  = () => {
-    console.log('sss')
- }
- 则变成点击也会打印'sss'
- 所以invoker改成invokers变成了一个对象 -->
+对应同一个事件类型也可以绑定多个事件处理函数
+vnode.props.onClick = [() => {
+    alert('ss1')
+}, () => {
+    alert('ss2')
+}]
