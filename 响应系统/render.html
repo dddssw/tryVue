@@ -41,6 +41,10 @@
             },]
         })
         function unmount(vnode) {
+            if (vnode.type === Fragment) {
+                vnode.children.forEach(c => unmount(c))
+                return
+            }
             const parent = vnode.el.parentNode
             if (parent) {
                 parent.removeChild(vnode.el)
@@ -282,6 +286,3 @@
 </body>
 
 </html>
-createTextNode createComment 和 el.nodeValue为了保
-证渲染器核心的跨平台能力，我们需要将这两个操作 DOM 的 API 封
-装到渲染器的选项中
