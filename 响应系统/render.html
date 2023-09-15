@@ -13,6 +13,8 @@
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
     <script>
         const { effect, reactive } = VueReactivity;
+        const Text = Symbol()
+        const Comment = Symbol()
         const vnode = reactive({
             type: 'div',
             props: {
@@ -23,7 +25,7 @@
                 }
 
             },
-            children: '点击'
+            children: [{ type: Text, children: '文本内容' }, { type: Comment, children: '注释内容' }, { type: 'span', children: 'change' },]
         })
         function unmount(vnode) {
             const parent = vnode.el.parentNode
@@ -61,7 +63,7 @@
                 if (typeof vnode.children === "string") {
                     setElementText(el, vnode.children)
                 } else {
-          
+
                     vnode.children.forEach(item => {
                         patch(null, item, el)
                     })
@@ -71,7 +73,6 @@
                         patchProps(el, key, null, vnode.props[key])
                     }
                 }
-                debugger
                 insert(el, container)
             }
             function patchElement(n1, n2) {
@@ -115,13 +116,9 @@
                     }
                     else {
                         setElementText(container, '')
-                        n2.children.forEach((c) => { 
-                            if(typeof c == 'string'){
-                                setElementText(container, c)
-                            }
-                            else{
-                                patch(null, c, container) 
-                            }
+                        n2.children.forEach((c) => {
+                            //这里不需要
+                            patch(null, c, container)
                         })
                     }
                 }
@@ -143,17 +140,48 @@
                     mountElement()
                     n1 = null
                 }
-                if (!n1) {
-                    mountElement(n2, container)
-                } else {
-                    if (n1.type !== n2.type) {
-                        unmount(n1)
+                const { type } = n2
+                if (typeof type === 'string') {
+                    if (!n1) {
                         mountElement(n2, container)
+                    } else {
+                        if (n1.type !== n2.type) {
+                            unmount(n1)
+                            mountElement(n2, container)
+                        }
+                        else {//这里就不直接卸载了，需要进行比较
+                            patchElement(n1, n2)
+                        }
                     }
-                    else {//这里就不直接卸载了，需要进行比较
-                        patchElement(n1, n2)
+                } else if (type === Text) {
+                    if (!n1) {
+                        // 使用 createTextNode 创建文本节点
+                        const el = n2.el = document.createTextNode(n2.children)
+                        // 将文本节点插入到容器中
+                        insert(el, container)
+                    }
+                    else {
+                        // 如果旧 vnode 存在，只需要使用新文本节点的文本内容更新旧文本节点即可
+                        const el = n2.el = n1.el
+                        if (n2.children !== n1.children)
+                            el.nodeValue = n2.children
                     }
                 }
+                else if(type === Comment){
+                    if (!n1) {
+                        // 使用 createTextNode 创建文本节点
+                        const el = n2.el = document.createComment(n2.children)
+                        // 将文本节点插入到容器中
+                        insert(el, container)
+                    }
+                    else {
+                        // 如果旧 vnode 存在，只需要使用新文本节点的文本内容更新旧文本节点即可
+                        const el = n2.el = n1.el
+                        if (n2.children !== n1.children)
+                            el.nodeValue = n2.children
+                    }
+                }
+
             }
 
             return {
@@ -215,14 +243,12 @@
         effect(() => {
             renderer.render(vnode, container)
         });
-        vnode.children=['ssssss',{type:'span', children:'changed'},]
+        vnode.children = [{ type: Text, children: '改变之后的文本内容' }, { type: Comment, children: '改变之后的注释内容' }, { type: 'span', children: 'changed' },]
     </script>
 </body>
 
 </html>
-对于一个元素来说，它的子节点无非有以下三种情况。
-没有子节点，此时 vnode.children 的值为 null。
-具有文本子节点，此时 vnode.children 的值为字符串，代表
-文本的内容。
-其他情况，无论是单个元素子节点，还是多个子节点（可能是文
-本和元素的混合），都可以用数组来表示。
+文本节点和注释节点创建了 symbol 类型
+的值，并将其作为 vnode.type 属性的值。这样就能够用 vnode 来
+描述文本节点和注释节点了。由于文本节点和注释节点只关心文本内
+容，所以我们用 vnode.children 来存储它们对应的文本内容。
