@@ -10,6 +10,7 @@
 <body>
     <div id="app"></div>
     <script src="https://unpkg.com/@vue/reactivity@3.0.5/dist/reactivity.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
     <script>
         const { effect, reactive } = VueReactivity;
         const vnode = reactive({
@@ -52,8 +53,9 @@
                         unmount(container._vnode)
                     }
                 }
-                container._vnode = vnode
+                container._vnode = _.cloneDeep(vnode)
             }
+
             function mountElement(vnode, container) {
                 const el = vnode.el = createElement(vnode.type)//add，对这个入参添加el属性，传入的入参的改变会一直保留下来，因为他是引用类型
                 if (typeof vnode.children === "string") {
@@ -80,8 +82,8 @@
                     mountElement(n2, container)
                 } else {
                     // if (n1.type !== n2.type) {
-                    unmount(n2)
-                    mountElement(n1, container)
+                        unmount(n1)
+                        mountElement(n2, container)//这里把新值旧值搞反了，但没有深拷贝n1和n2是完全相同的，所以这个错误忽略了
                     // }
                 }
             }
@@ -157,7 +159,7 @@
 
 对应同一个事件类型也可以绑定多个事件处理函数
 vnode.props.onClick = [() => {
-    alert('ss1')
+alert('ss1')
 }, () => {
-    alert('ss2')
+alert('ss2')
 }]
