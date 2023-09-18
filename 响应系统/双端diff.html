@@ -167,8 +167,9 @@
                         newStartVNode = newChildren[++newStartIdx]
                     } else {
                         // 遍历旧 children，试图寻找与 newStartVNode 拥有相同 key 值的元素
+                        console.log(oldChildren)
                         const idxInOld = oldChildren.findIndex(
-                            node => node.key === newStartVNode.key
+                            node => node?.key === newStartVNode.key
                         )
                         // idxInOld 大于 0，说明找到了可复用的节点，并且需要将其对应的真实DOM 移动到头部
                         if (idxInOld > 0) {
@@ -200,6 +201,17 @@
                         patch(null, newChildren[i], container,)
                     }
                 }
+                //                 与处理新增节点类似，我们在 while 循环结束后又增加了一个
+                // else...if 分支，用于卸载已经不存在的节点。索
+                // 引值位于 oldStartIdx 和 oldEndIdx 这个区间内的节点都应该被
+                // 卸载，于是我们开启一个 for 循环将它们逐一卸载。
+                else if (newEndIdx < newStartIdx && oldStartIdx <= oldEndIdx) {
+                    // 移除操作
+                    for (let i = oldStartIdx; i <= oldEndIdx; i++) {
+                        unmount(oldChildren[i])
+                    }
+                }
+
             }
 
             function patch(n1, n2, container, anchor) {
@@ -319,10 +331,10 @@
         });
         vnode.children =
             [
-     
+
                 { type: 'p', children: '2', key: 2 },
                 { type: 'p', children: '4', key: 4 },
-                { type: 'p', children: '1', key: 1 },
+                // { type: 'p', children: '1', key: 1 },
                 { type: 'p', children: '3', key: 3 },
                 { type: 'p', children: '6', key: 6 },
                 { type: 'p', children: '5', key: 5 }
