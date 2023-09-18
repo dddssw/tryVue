@@ -61,7 +61,7 @@
                 container._vnode = _.cloneDeep(vnode)
             }
 
-            function mountElement(vnode, container) {
+            function mountElement(vnode, container, anchor) {
                 const el = vnode.el = createElement(vnode.type)
                 if (typeof vnode.children === "string") {
                     setElementText(el, vnode.children)
@@ -75,7 +75,7 @@
                         patchProps(el, key, null, vnode.props[key])
                     }
                 }
-                insert(el, container)
+                insert(el, container, anchor)
             }
             function patchElement(n1, n2) {
                 const el = n2.el = n1.el
@@ -112,46 +112,49 @@
                         const commonLength = Math.min(oldLen, newLen)
                         let lastIndex = 0
                         for (let i = 0; i < newLen; i++) {
-                            const newVnode = newChildren[i];
-                            for (let j = 0; j < oldLen; j++) {
-                                const oldVnode = oldChildren[i];
-                                if (newVnode.key === oldVnode.key) {
-                                    patch(oldVnode, newVnode, container)
+                            const newVNode = newChildren[i];
+                            // 在第一层循环中定义变量 find，代表是否在旧的一组子节点中找到可复用的节点，
+                            // 初始值为 false，代表没找到
+                            let find = false
+                            for (j = 0; j < oldChildren.length; j++) {
+                                const oldVNode = oldChildren[j]
+                                if (newVNode.key === oldVNode.key) {
+                                    // 一旦找到可复用的节点，则将变量 find 的值设为 true
+                                    find = true
+                                    patch(oldVNode, newVNode, container)
                                     if (j < lastIndex) {
-                                        // 代码运行到这里，说明 newVNode 对应的真实 DOM 需要移动
-                                        // 先获取 newVNode 的前一个 vnode，即 prevVNode
                                         const prevVNode = newChildren[i - 1]
-                                        // 如果 prevVNode 不存在，则说明当前 newVNode 是第一个节点，它不需要移动
                                         if (prevVNode) {
-                                            // 由于我们要将 newVNode 对应的真实 DOM 移动到prevVNode 所对应真实 DOM 后面，
-                                            // 所以我们需要获取 prevVNode 所对应真实 DOM 的下一个兄弟节点，并将其作为锚点
                                             const anchor = prevVNode.el.nextSibling
-                                            // 调用 insert 方法将 newVNode 对应的真实 DOM 插入到锚点元素前面，
-                                            // 也就是 prevVNode 对应真实 DOM 的后面
                                             insert(newVNode.el, container, anchor)
                                         }
                                     } else {
                                         lastIndex = j
                                     }
                                     break
-
                                 }
                             }
+                            // 如果代码运行到这里，find 仍然为 false，
+                            // 说明当前 newVNode 没有在旧的一组子节点中找到可复用的节点
+                            // 也就是说，当前 newVNode 是新增节点，需要挂载
+                            if (!find) {
+                                // 为了将节点挂载到正确位置，我们需要先获取锚点元素
+                                // 首先获取当前 newVNode 的前一个 vnode 节点
+                                const prevVNode = newChildren[i - 1]
+                                let anchor = null
+                                if (prevVNode) {
+                                    anchor = prevVNode.el.nextSibling
+                                }
+                                else {
+                                    // 如果没有前一个 vnode 节点，说明即将挂载的新节点是第一个子节
+                                    // 这时我们使用容器元素的 firstChild 作为锚点
+                                    anchor = container.firstChild
+                                }
+                                // 挂载 newVNode
+                                patch(null, newVNode, container, anchor)
+                            }
+
                         }
-                        // for (let i = 0; i < commonLength; i++) {
-                        //     patch(oldChildren[i], newChildren[i], container)
-                        // }
-                        // if (newLen > oldLen) {
-                        //     for (let i = commonLength; i < newLen; i++) {
-                        //         patch(null, newVnode[i], container)
-                        //     }
-                        // }
-                        // else if (newLen < oldLen) {
-                        //     for (let i = commonLength; i < oldLen; i++) {
-                        //         unmount(oldVnode[i])
-                        //     }
-                        // }
-                       // console.timeEnd('set')//0.053955078125 ms
                         console.timeEnd('set')//0.0361328125 ms
                     }
                     else {
@@ -170,7 +173,7 @@
                 }
             }
 
-            function patch(n1, n2, container) {
+            function patch(n1, n2, container, anchor) {
                 if (n1 && n1.type !== n2.type) {
                     mountElement()
                     n1 = null
@@ -178,7 +181,8 @@
                 const { type } = n2
                 if (typeof type === 'string') {
                     if (!n1) {
-                        mountElement(n2, container)
+                        // 挂载时将锚点元素作为第三个参数传递给 mountElement 函数
+                        mountElement(n2, container, anchor)
                     } else {
                         if (n1.type !== n2.type) {
                             unmount(n1)
@@ -289,7 +293,8 @@
             [
                 { type: 'p', children: '2', key: 2 },
                 { type: 'p', children: '1', key: 1 },
-                { type: 'p', children: '3', key: 3 }
+                { type: 'p', children: '3', key: 3 },
+                { type: 'p', children: '4', key: 4 }
             ]
     </script>
 </body>
