@@ -104,9 +104,34 @@
                 }
                 else if (Array.isArray(n2.children)) {
                     if (Array.isArray(n1.children)) {
-                        console.log('sss')
-                        n1.children.forEach(c => unmount(c))
-                        n2.children.forEach(c => patch(null, c, container))
+                        // console.time('set')
+                        // n1.children.forEach(c => unmount(c))
+                        // n2.children.forEach(c => patch(null, c, container))
+                        // console.timeEnd('set')//0.093994140625 ms
+                        console.time('set')
+                        const oldChildren = n1.children
+                        const newChildren = n2.children
+                        const oldLen = oldChildren.length
+                        // 新的一组子节点的长度
+                        const newLen = newChildren.length
+                        // 两组子节点的公共长度，即两者中较短的那一组子节点的长度
+                        const commonLength = Math.min(oldLen, newLen)
+                        for (let i = 0; i < commonLength; i++) {
+                            patch(oldChildren[i], newChildren[i], container)
+                        }
+                        //需要挂载
+                        if (newLen > oldLen) {
+                            for (let i = commonLength; i < newLen; i++) {
+                                patch(null, newVnode[i], container)
+                            }
+                        }
+                        //卸载
+                        else if (newLen < oldLen) {
+                            for (let i = commonLength; i < oldLen; i++) {
+                                unmount(oldVnode[i])
+                            }
+                        }
+                        console.timeEnd('set')//0.058837890625 ms
                     }
                     else {
                         setElementText(container, '')
@@ -237,7 +262,6 @@
         })
         let container = document.querySelector('#app')
         effect(() => {
-            console.log('sss')
             renderer.render(vnode, container)
         });
         vnode.children =
