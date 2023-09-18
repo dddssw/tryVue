@@ -21,7 +21,8 @@
             children: [
                 { type: 'p', children: '1', key: 1 },
                 { type: 'p', children: '2', key: 2 },
-                { type: 'p', children: '3', key: 3 }
+                { type: 'p', children: '3', key: 3 },
+                { type: 'p', children: '4', key: 4 }
             ]
         })
         function unmount(vnode) {
@@ -136,7 +137,12 @@
                 let newStartVNode = newChildren[newStartIdx]
                 let newEndVNode = newChildren[newEndIdx]
                 while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
-                    if (oldStartVNode.key === newStartVNode.key) {
+                    if (!oldStartVNode) {
+ oldStartVNode = oldChildren[++oldStartIdx]
+ } else if (!oldEndVNode) {
+ oldEndVNode = oldChildren[--oldEndIdx]
+ }
+                  else  if (oldStartVNode.key === newStartVNode.key) {
                         // 调用 patch 函数在 oldStartVNode 与 newStartVNode 之间打补丁
                         patch(oldStartVNode, newStartVNode, container)
                         // 更新相关索引，指向下一个位置
@@ -159,7 +165,26 @@
 
                         oldEndVNode = oldChildren[--oldEndIdx]
                         newStartVNode = newChildren[++newStartIdx]
+                    } else {
+                        // 遍历旧 children，试图寻找与 newStartVNode 拥有相同 key 值的元素
+                        const idxInOld = oldChildren.findIndex(
+                            node => node.key === newStartVNode.key
+                        )
+                        // idxInOld 大于 0，说明找到了可复用的节点，并且需要将其对应的真实DOM 移动到头部
+                        if (idxInOld > 0) {
+                            // idxInOld 位置对应的 vnode 就是需要移动的节点
+                            const vnodeToMove = oldChildren[idxInOld]
+                            // 不要忘记除移动操作外还应该打补丁
+                            patch(vnodeToMove, newStartVNode, container)
+                            // 将 vnodeToMove.el 移动到头部节点 oldStartVNode.el 之前，因此使用后者作为锚点
+                            insert(vnodeToMove.el, container, oldStartVNode.el)
+                            // 由于位置 idxInOld 处的节点所对应的真实 DOM 已经移动到了别处，因此将其设置为 undefined
+                            oldChildren[idxInOld] = undefined
+                            // 最后更新 newStartIdx 到下一个位置
+                            newStartVNode = newChildren[++newStartIdx]
+                        }
                     }
+
                 }
 
             }
@@ -281,9 +306,10 @@
         });
         vnode.children =
             [
-                { type: 'p', children: '3', key: 3 },
                 { type: 'p', children: '2', key: 2 },
-                { type: 'p', children: '1', key: 1 }
+                { type: 'p', children: '4', key: 4 },
+                { type: 'p', children: '1', key: 1 },
+                { type: 'p', children: '3', key: 3 }
             ]
     </script>
 </body>
