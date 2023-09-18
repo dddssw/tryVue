@@ -113,13 +113,10 @@
                         let lastIndex = 0
                         for (let i = 0; i < newLen; i++) {
                             const newVNode = newChildren[i];
-                            // 在第一层循环中定义变量 find，代表是否在旧的一组子节点中找到可复用的节点，
-                            // 初始值为 false，代表没找到
                             let find = false
                             for (j = 0; j < oldChildren.length; j++) {
                                 const oldVNode = oldChildren[j]
                                 if (newVNode.key === oldVNode.key) {
-                                    // 一旦找到可复用的节点，则将变量 find 的值设为 true
                                     find = true
                                     patch(oldVNode, newVNode, container)
                                     if (j < lastIndex) {
@@ -134,28 +131,34 @@
                                     break
                                 }
                             }
-                            // 如果代码运行到这里，find 仍然为 false，
-                            // 说明当前 newVNode 没有在旧的一组子节点中找到可复用的节点
-                            // 也就是说，当前 newVNode 是新增节点，需要挂载
                             if (!find) {
-                                // 为了将节点挂载到正确位置，我们需要先获取锚点元素
-                                // 首先获取当前 newVNode 的前一个 vnode 节点
                                 const prevVNode = newChildren[i - 1]
                                 let anchor = null
                                 if (prevVNode) {
                                     anchor = prevVNode.el.nextSibling
                                 }
                                 else {
-                                    // 如果没有前一个 vnode 节点，说明即将挂载的新节点是第一个子节
-                                    // 这时我们使用容器元素的 firstChild 作为锚点
                                     anchor = container.firstChild
                                 }
-                                // 挂载 newVNode
                                 patch(null, newVNode, container, anchor)
                             }
 
                         }
-                        console.timeEnd('set')//0.0361328125 ms
+                        // 上一步的更新操作完成后
+                        // 遍历旧的一组子节点
+                        for (let i = 0; i < oldChildren.length; i++) {
+                            const oldVNode = oldChildren[i]
+                            // 拿旧子节点 oldVNode 去新的一组子节点中寻找具有相同 key 值的节点
+                            const has = newChildren.find(
+                                vnode => vnode.key === oldVNode.key
+                            )
+                            if (!has) {
+                                // 如果没有找到具有相同 key 值的节点，则说明需要删除该节点
+                                // 调用 unmount 函数将其卸载
+                                unmount(oldVNode)
+                            }
+                        }
+                        console.timeEnd('set')
                     }
                     else {
                         setElementText(container, '')
@@ -181,7 +184,6 @@
                 const { type } = n2
                 if (typeof type === 'string') {
                     if (!n1) {
-                        // 挂载时将锚点元素作为第三个参数传递给 mountElement 函数
                         mountElement(n2, container, anchor)
                     } else {
                         if (n1.type !== n2.type) {
@@ -291,7 +293,6 @@
         });
         vnode.children =
             [
-                { type: 'p', children: '2', key: 2 },
                 { type: 'p', children: '1', key: 1 },
                 { type: 'p', children: '3', key: 3 },
                 { type: 'p', children: '4', key: 4 }
