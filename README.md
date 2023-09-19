@@ -4,10 +4,7 @@
 ![存储副作用的容器](https://github.com/dddssw/tryVue/assets/58782768/1b5e24b1-2955-43ab-97cd-ae875fb70983)
 
 
----
-theme: fancy
-highlight: a11y-light
----
+
 ## 渲染器
 
 `renderer`代表渲染器,`render`是动词，渲染。渲染器会把虚拟 DOM 渲染为真实 DOM 元素。渲染器把虚拟 DOM 节点渲染为真实 DOM 节点的过程叫作`挂载`。因此，渲染器通常需要接收一个挂载点作为参数，用来指定具体的挂载位置。这里的“挂载点”其实就是一个DOM 元素，渲染器会把该 DOM 元素作为容器元素，并把内容渲染到其中。我们通常用英文 container 来表达容器。
@@ -116,4 +113,8 @@ function mountElement(vnode, container) {
     }
     }
 ```
- 
+ ## 解析器
+   用来将模板字符串解析为模板 AST 的解析器（parser）；
+   用来将模板 AST 转换为 JavaScript AST 的转换器（transformer）；
+   用来根据 JavaScript AST 生成渲染函数代码的生成器（generator）。
+
