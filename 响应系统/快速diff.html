@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="app"></div>
+    <script src="https://unpkg.com/@vue/reactivity@3.0.5/dist/reactivity.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script>
+        function getSequence(arr) {
+            const p = arr.slice()
+            const result = [0]
+            let i, j, u, v, c
+            const len = arr.length
+            for (i = 0; i < len; i++) {
+                const arrI = arr[i]
+                if (arrI !== 0) {
+                    j = result[result.length - 1]
+                    if (arr[j] < arrI) {
+                        p[i] = j
+                        result.push(i)
+                        continue
+                    }
+                    u = 0
+                    v = result.length - 1
+                    while (u < v) {
+                        c = ((u + v) / 2) | 0
+                        if (arr[result[c]] < arrI) {
+                            u = c + 1
+                        } else {
+                            v = c
+                        }
+                    }
+                    if (arrI < arr[result[u]]) {
+                        if (u > 0) {
+                            p[i] = result[u - 1]
+                        }
+                        result[u] = i
+                    }
+                }
+            }
+            u = result.length
+            v = result[u - 1]
+            while (u-- > 0) {
+                result[u] = v
+                v = p[v]
+            }
+            return result
+        }
+
+        const { effect, reactive } = VueReactivity;
+        const Text = Symbol()
+        const Comment = Symbol()
+        const Fragment = Symbol()
+        let vnode = reactive({
+            type: 'div',
+            children: [
+                { type: 'p', children: '1', key: 1 },
+                { type: 'p', children: '2', key: 2 },
+                { type: 'p', children: '3', key: 3 },
+                { type: 'p', children: '4', key: 4 },
+                { type: 'p', children: '6', key: 6 },
+                { type: 'p', children: '5', key: 5 },
+            ]
+        })
+        function unmount(vnode) {
+            if (vnode.type === Fragment) {
+                vnode.children.forEach(c => unmount(c))
+                return
+            }
+            const parent = vnode.el.parentNode
+            if (parent) {
+                parent.removeChild(vnode.el)
+            }
+        }
+
+        function shouldSetAsProps(el, key, value) {
+            if (key === 'form' && el.tagName === 'INPUT') return false
+            return key in el
+        }
+        function createRenderer(options) {
+
+            const {
+                createElement,
+                insert,
+                setElementText,
+                patchProps,
+                createText,
+                createComment,
+            } = options
+
+            function render(vnode, container) {
+                if (vnode) {
+                    patch(container._vnode, vnode, container)
+                } else {
+                    if (container._vnode) {
+                        unmount(container._vnode)
+                    }
+                }
+                container._vnode = _.cloneDeep(vnode)
+            }
+
+            function mountElement(vnode, container, anchor) {
+                const el = vnode.el = createElement(vnode.type)
+                if (typeof vnode.children === "string") {
+                    setElementText(el, vnode.children)
+                } else {
+                    vnode.children.forEach(item => {
+                        patch(null, item, el)
+                    })
+                }
+                if (vnode.props) {
+                    for (const key in vnode.props) {
+                        patchProps(el, key, null, vnode.props[key])
+                    }
+                }
+                insert(el, container, anchor)
+            }
+            function patchElement(n1, n2) {
+                const el = n2.el = n1.el
+                const oldProps = n1.props
+                const newProps = n2.props
+                for (const key in newProps) {
+                    if (newProps[key] !== oldProps[key]) {
+                        patchProps(el, key, oldProps[key], newProps[key])
+                    }
+                }
+                for (const key in oldProps) {
+                    if (!(key in newProps)) {
+                        patchProps(el, key, oldProps[key], null)
+                    }
+                }
+                patchChildren(n1, n2, el)
+            }
+            function patchChildren(n1, n2, container) {
+                if (typeof n2.children === 'string') {
+                    if (Array.isArray(n1.children)) {
+                        n1.children.forEach((c) => { unmount(c) })
+                    }
+                    else {
+                        setElementText(container, n2.children)
+                    }
+                }
+                else if (Array.isArray(n2.children)) {
+                    if (Array.isArray(n1.children)) {
+                        //快速diff开始
+                        const newChildren = n2.children
+                        const oldChildren = n1.children
+                        // 更新相同的前置节点
+                        let j = 0
+                        let oldVNode = oldChildren[j]
+                        let newVNode = newChildren[j]
+                        while (oldVNode.key === newVNode.key) {
+                            patch(oldVNode, newVNode, container)
+                            j++
+                            oldVNode = oldChildren[j]
+                            newVNode = newChildren[j]
+                            if (!oldVNode || !newVNode) break
+                        }
+
+                        // 更新相同的后置节点
+                        // 索引 oldEnd 指向旧的一组子节点的最后一个节点
+                        let oldEnd = oldChildren.length - 1
+                        // 索引 newEnd 指向新的一组子节点的最后一个节点
+                        let newEnd = newChildren.length - 1
+
+                        oldVNode = oldChildren[oldEnd]
+                        newVNode = newChildren[newEnd]
+                        // while 循环从后向前遍历，直到遇到拥有不同 key 值的节点为止
+                        while (oldVNode.key === newVNode.key) {
+                            // 调用 patch 函数进行更新
+                            patch(oldVNode, newVNode, container)
+                            // 递减 oldEnd 和 nextEnd
+                            oldEnd--
+                            newEnd--
+                            oldVNode = oldChildren[oldEnd]
+                            newVNode = newChildren[newEnd]
+                            //赋值后的新旧节点是undefined，直接退出
+                            if (!oldVNode || !newVNode) break
+                        }
+                        // 预处理完毕后，如果满足如下条件，则说明从 j --> newEnd 之间的节点应作为新节点插入
+                        if (j > oldEnd && j <= newEnd) {
+                            // 锚点的索引
+                            const anchorIndex = newEnd + 1
+                            // 锚点元素
+                            const anchor = anchorIndex < newChildren.length ? newChildren[anchorIndex].el : null
+                            // 采用 while 循环，调用 patch 函数逐个挂载新增节点
+                            while (j <= newEnd) {
+                                patch(null, newChildren[j++], container, anchor)
+                            }
+                        } else if (j > newEnd && j <= oldEnd) {
+                            // j -> oldEnd 之间的节点应该被卸载
+                            while (j <= oldEnd) {
+                                unmount(oldChildren[j++])
+                            }
+                        } else {
+                            //处理非理想状态
+                            const count = newEnd - j + 1
+                            const source = new Array(count)
+                            source.fill(-1)
+
+                            // oldStart 和 newStart 分别为起始索引，即 j
+                            let oldStart = j
+                            let newStart = j
+                            // 构建索引表
+                            const keyIndex = {}
+                            for (; newStart <= newEnd; newStart++) {
+                                keyIndex[newChildren[newStart].key] = newStart
+                            }
+                            for (; oldStart <= oldEnd; oldStart++) {
+                                oldVNode = oldChildren[oldStart]
+                                let u = keyIndex[oldVNode.key]
+                                if (u) {
+                                    newVNode = newChildren[u]
+                                    // 调用 patch 函数完成更新
+                                    patch(oldVNode, newVNode, container)
+                                    source[u - j] = oldStart
+                                }
+                                else {
+                                    //not found
+                                    unmount(oldVNode)
+                                }
+                            }
+                            for (let i = source.length - 1; i >= 0; i--) {
+                                if (source[i] === -1) {
+                                    const pos = i + j
+                                    const newVNode = newChildren[pos]
+                                    let anchor = newChildren[pos + 1] ? newChildren[pos + 1].el : null
+                                    patch(null, newVNode, container, anchor)
+                                }
+                                if (getSequence(source).filter(item => item !== i)) {
+                                    const pos = i + j
+                                    const newVNode = newChildren[pos]
+                                    let anchor = newChildren[pos + 1] ? newChildren[pos + 1].el : null
+                                    insert(newVNode.el, container, anchor)
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        setElementText(container, '')
+                        n2.children.forEach((c) => {
+                            patch(null, c, container)
+                        })
+                    }
+                }
+                else {
+                    if (Array.isArray(n1.children)) {
+                        n1.children.forEach(c => unmount(c))
+                    } else if (typeof n1.children === 'string') {
+                        setElementText(container, '')
+                    }
+                }
+            }
+
+            function patch(n1, n2, container, anchor) {
+                if (n1 && n1.type !== n2.type) {
+                    mountElement()
+                    n1 = null
+                }
+                const { type } = n2
+                if (typeof type === 'string') {
+                    if (!n1) {
+                        mountElement(n2, container, anchor)
+                    } else {
+                        if (n1.type !== n2.type) {
+                            unmount(n1)
+                            mountElement(n2, container)
+                        }
+                        else {
+                            patchElement(n1, n2)
+                        }
+                    }
+                } else if (type === Text) {
+                    if (!n1) {
+                        const el = n2.el = createText(n2.children)
+                        insert(el, container)
+                    }
+                    else {
+                        const el = n2.el = n1.el
+                        if (n2.children !== n1.children)
+                            setText(el, n2.children)
+                    }
+                }
+                else if (type === Comment) {
+                    if (!n1) {
+                        const el = n2.el = createComment(n2.children)
+                        insert(el, container)
+                    }
+                    else {
+                        const el = n2.el = n1.el
+                        if (n2.children !== n1.children)
+                            setText(el, n2.children)
+                    }
+                }
+                else if (type === Fragment) {
+                    if (!n1) {
+                        n2.children.forEach(c => patch(null, c, container))
+                    } else {
+                        patchChildren(n1, n2, container)
+                    }
+                }
+            }
+            return {
+                render
+            }
+        }
+        const renderer = createRenderer({
+            createElement(tag) {
+                return document.createElement(tag)
+            },
+            setElementText(el, text) {
+                el.textContent = text
+            },
+            insert(el, parent, anchor = null) {
+                parent.insertBefore(el, anchor)
+            },
+            createText(text) {
+                return document.createTextNode(text)
+            },
+            createComment(comment) {
+                return document.createComment(comment)
+            },
+            setText(el, text) {
+                el.nodeValue = text
+            },
+
+            patchProps(el, key, prevValue, nextValue) {
+                if (/^on/.test(key)) {
+                    let invokers = el._vei || (el._vei = {})
+                    const name = key.slice(2).toLowerCase()
+                    if (nextValue) {
+                        if (invokers[key]) {
+                            invokers[key].value = nextValue
+                        } else {
+                            invokers[key] = el._vei.key = (e) => {
+                                if (Array.isArray(invokers[key].value)) {
+                                    invokers[key].value.forEach((fn) => {
+                                        fn(e)
+                                    })
+                                }
+                                else {
+                                    invokers[key].value(e)
+                                }
+                            }
+                            invokers[key].value = nextValue
+                            el.addEventListener(name, invokers[key])
+                        }
+                    } else if (invokers[key]) {
+                        el.removeEventListener(name, invokers[key])
+                    }
+                }
+                if (key === 'class') { el.className = nextValue || '' }
+                else if (shouldSetAsProps(el, key, nextValue)) {
+                    const type = typeof el[key]
+                    if (type === 'boolean' && nextValue === '') {
+                        el[key] = true
+                    } else {
+                        el[key] = nextValue
+                    }
+                } else {
+                    el.setAttribute(key, nextValue)
+                }
+            }
+
+        })
+        let container = document.querySelector('#app')
+        effect(() => {
+            renderer.render(vnode, container)
+        });
+        vnode.children =
+            [
+                { type: 'p', children: '1', key: 1 },
+                { type: 'p', children: '3', key: 3 },
+                { type: 'p', children: '4', key: 4 },
+                { type: 'p', children: '2', key: 2 },
+                { type: 'p', children: '7', key: 7 },
+                { type: 'p', children: '5', key: 5 },
+                { type: 'p', children: '8', key: 8 },
+                { type: 'p', children: '9', key: 9 },
+            ]
+    </script>
+</body>
+
+
+</html>
