@@ -8,10 +8,8 @@ function parse(content) {
 function isEnd(context, ancestors) {
   const s = context.source;
   for (let i = 0; i < ancestors.length; i++) {
-    
     const tag = ancestors[ancestors.length - 1]?.tag;
-    if (tag === s.slice(2, 2 + tag.length))
-      return true;
+    if (tag === s.slice(2, 2 + tag.length)) return true;
   }
   return !s;
 }
@@ -27,8 +25,8 @@ function parseChild(context, ancestors) {
         if (/[a-z]/i.test(context.source[1])) {
           node = parseElement(context, ancestors);
         } else if (context.source[1] === "/") {
-          parseTag(context,'End')
-       continue
+          parseTag(context, "End");
+          continue;
         }
       } else if (context.source.startsWith("{{")) {
         node = parseInterpolation(context);
@@ -49,7 +47,7 @@ function parseChild(context, ancestors) {
 function parseInterpolation(context) {
   const index = context.source.indexOf("}}");
   const content = context.source.slice(2, index);
-  advanceBy(context,index + 2);
+  advanceBy(context, index + 2);
   return {
     type: "Interpolation",
     content,
@@ -68,6 +66,7 @@ function parseText(context) {
 }
 function parseElement(context, ancestors) {
   const element = parseTag(context, "Start");
+  if(element.isSelfClosing) return element
   ancestors.push(element);
   element.children = parseChild(context, ancestors);
   ancestors.pop();
@@ -82,17 +81,27 @@ function parseElement(context, ancestors) {
 function parseTag(context, type) {
   const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source);
   const tag = match[1];
-  advanceBy(context, type === "Start" ? 2 + tag.length : 3 + tag.length);
+  advanceBy(context, match[0].length);
+  advanceSpaces(context);
+  const isSelfClosing=context.source.startsWith("/>")
+  advanceBy(context, isSelfClosing ? 2 : 1);
   return type === "Start"
     ? {
         type: "Element",
-        tag,
+      tag,
+        isSelfClosing
       }
     : null;
 }
 function advanceBy(context, nums) {
   context.source = context.source.slice(nums);
 }
-const content = "<div><p>{{hi}}<span></div>";
+function advanceSpaces(context) {
+  const match = /^[\t\r\n\f ]+/.exec(context.source);
+  if (match) {
+    advanceBy(context, match[0].length);
+  }
+}
+const content = "<div   ><p/>{{hi}}<span></span></div>";
 const a = parse(content);
 console.log(a);
